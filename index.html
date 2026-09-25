@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Interactive flipbook — 47 pages" />
+
+  <!-- Open Graph / social preview -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:title"       content="Snkatha" />
+  <meta property="og:description" content="Interactive flipbook — 47 pages" />
+  <meta name="twitter:card"       content="summary" />
+  <meta name="twitter:title"      content="Snkatha" />
+  <meta name="twitter:description" content="Interactive flipbook — 47 pages" />
+
+  <!-- Emoji favicon — no extra file needed -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+
+  <title>Snkatha</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:         #0f1117;
+      --surface:    #1a1d2e;
+      --toolbar-bg: #13162a;
+      --toolbar-h:  54px;
+      --header-h:   0px;
+      --accent:     #4f8ef7;
+      --accent-alt: #e94560;
+      --text:       #e8eaf0;
+      --text-dim:   #7a7d99;
+      --border:     rgba(255,255,255,.09);
+      --radius:     7px;
+      --ease:       0.18s ease;
+    }
+    html, body {
+      height: 100%; width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Toolbar ──────────────────────────────────────────────────────────── */
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: var(--toolbar-h);
+      background: var(--toolbar-bg);
+      display: flex; align-items: center; gap: 5px;
+      padding: 0 14px;
+      z-index: 100;
+      box-shadow: 0 1px 0 var(--border), 0 4px 20px rgba(0,0,0,.5);
+    }
+    .tb-title {
+      flex: 1; font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .tb-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text); cursor: pointer;
+      padding: 5px 10px; border-radius: var(--radius);
+      font-size: 12px; display: flex; align-items: center; gap: 4px;
+      transition: background var(--ease), border-color var(--ease);
+      user-select: none; white-space: nowrap; flex-shrink: 0;
+    }
+    .tb-btn:hover  { background: rgba(79,142,247,.15); border-color: var(--accent); }
+    .tb-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tb-sep { width: 1px; height: 26px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+    #page-input {
+      background: rgba(255,255,255,.06); border: 1px solid var(--border);
+      color: var(--text); border-radius: var(--radius);
+      padding: 4px 6px; width: 46px; font-size: 12px; text-align: center;
+    }
+    #page-input:focus { outline: none; border-color: var(--accent); }
+    #page-count { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+
+    /* ── TOC Drawer ───────────────────────────────────────────────────────── */
+    #toc {
+      position: fixed; top: var(--toolbar-h); left: 0; bottom: 0;
+      width: 280px; background: var(--surface);
+      transform: translateX(-100%);
+      transition: transform .28s ease;
+      z-index: 90; overflow-y: auto; padding: 14px 0;
+      box-shadow: 4px 0 24px rgba(0,0,0,.4);
+      border-right: 1px solid var(--border);
+    }
+    #toc.open { transform: translateX(0); }
+    #toc h3 {
+      font-size: 10px; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text-dim);
+      padding: 0 16px 10px;
+    }
+    .toc-item {
+      display: block; padding: 8px 16px; cursor: pointer;
+      font-size: 13px; color: var(--text);
+      border-left: 3px solid transparent;
+      transition: background var(--ease), border-color var(--ease);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .toc-item:hover    { background: rgba(255,255,255,.05); border-color: var(--accent); }
+    .toc-l2 { padding-left: 28px; font-size: 12px; color: var(--text-dim); }
+    .toc-l3 { padding-left: 40px; font-size: 11px; color: var(--text-dim); }
+
+    /* ── Stage ────────────────────────────────────────────────────────────── */
+    #stage {
+      position: fixed;
+      top: var(--toolbar-h); left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: left .28s ease;
+      overflow: hidden;
+    }
+    #stage.toc-open { left: 280px; }
+
+    /* ── Navigation Arrows ───────────────────────────────────────────────── */
+    .nav-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(19,22,42,.9); border: 1px solid var(--border);
+      color: var(--text); cursor: pointer;
+      width: 40px; height: 64px; border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; z-index: 10;
+      transition: background var(--ease), opacity var(--ease);
+      opacity: .55;
+    }
+    .nav-arrow:hover { background: var(--accent); opacity: 1; border-color: var(--accent); }
+    #nav-prev { left: 8px; }
+    #nav-next { right: 8px; }
+
+    /* ── Flipbook Wrap ───────────────────────────────────────────────────── */
+    #flipbook-wrap {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      transform-origin: center center;
+    }
+
+    /* ── Canvas rendering quality (crisp text on all DPR levels) ────────── */
+    #flipbook canvas {
+      image-rendering: auto;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: high-quality;
+    }
+
+    /* ── Pan Overlay ─────────────────────────────────────────────────────── */
+    #pan-overlay {
+      position: absolute; inset: 0; z-index: 5;
+      pointer-events: none; cursor: grab; touch-action: none; user-select: none;
+    }
+    #pan-overlay.active  { pointer-events: all; }
+    #pan-overlay.panning { cursor: grabbing; }
+
+    /* ── Thumbnail Strip ─────────────────────────────────────────────────── */
+    #thumbs-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: 0; overflow: hidden;
+      background: rgba(10,12,22,.97);
+      display: flex; align-items: center; gap: 8px; padding: 0 16px;
+      transition: height .28s ease; z-index: 80;
+      border-top: 1px solid var(--border);
+    }
+    #thumbs-bar.open { height: 108px; overflow-x: auto; overflow-y: hidden; }
+    .thumb {
+      flex-shrink: 0; height: 80px; cursor: pointer;
+      border: 2px solid transparent; border-radius: 4px;
+      opacity: .5; transition: opacity var(--ease), border-color var(--ease);
+    }
+    .thumb:hover, .thumb.active { opacity: 1; border-color: var(--accent); }
+
+    /* ── Loading Overlay ─────────────────────────────────────────────────── */
+    #loader {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 200; transition: opacity .5s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid rgba(79,142,247,.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loader p { margin-top: 16px; color: var(--text-dim); font-size: 14px; }
+
+    /* ── Hint Bar ────────────────────────────────────────────────────────── */
+    #hint {
+      position: fixed; bottom: 10px; right: 12px;
+      font-size: 11px; color: var(--text-dim);
+      background: rgba(19,22,42,.82);
+      padding: 5px 10px; border-radius: 5px;
+      pointer-events: none; line-height: 1.7;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Share Toast ─────────────────────────────────────────────────────── */
+    #share-toast {
+      position: fixed; bottom: 50px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--accent); color: #fff;
+      padding: 8px 18px; border-radius: 20px;
+      font-size: 13px; opacity: 0;
+      transition: opacity .25s ease, transform .25s ease;
+      pointer-events: none; z-index: 300;
+    }
+    #share-toast.show {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Touch-device minimum tap targets (all touch screens) ──────────── */
+    @media (hover: none) {
+      .tb-btn    { min-height: 40px; }
+      .nav-arrow { opacity: 0.88; }
+    }
+
+    /* ── Phone  (< 600 px) — single-page, scrollable toolbar ────────────── */
+    @media (max-width: 599px) {
+      :root { --toolbar-h: 48px; }
+      #toolbar {
+        gap: 3px; padding: 0 6px;
+        overflow-x: auto; overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      #toolbar::-webkit-scrollbar { display: none; }
+      .tb-btn   { padding: 4px 7px; font-size: 11px; gap: 3px; }
+      .tb-sep   { margin: 0 1px; height: 20px; }
+      .tb-title { font-size: 11px; min-width: 50px; }
+      #page-input { width: 34px; font-size: 11px; padding: 3px 4px; }
+      #page-count { font-size: 11px; }
+      /* Toolbar is scrollable on phone so we only hide navigation extremes */
+      #btn-first, #btn-last, #btn-thumbs, #btn-toc { display: none; }
+      #btn-zoom-in, #btn-zoom-out, #btn-zoom-fit { padding: 4px 6px; font-size: 11px; }
+      .nav-arrow {
+        width: 36px; height: 52px; font-size: 20px; opacity: 0.9;
+      }
+      #nav-prev { left: 2px; }
+      #nav-next { right: 2px; }
+      #thumbs-bar.open { height: 88px; }
+      .thumb { height: 62px; }
+      #hint { font-size: 10px; bottom: 6px; right: 6px; padding: 4px 7px; line-height: 1.5; }
+      #toc { width: 100%; }
+      #stage.toc-open { left: 0; }
+    }
+
+    /* ── Tablet  (600 px – 1023 px) — spread view, medium toolbar ────────── */
+    @media (min-width: 600px) and (max-width: 1023px) {
+      :root { --toolbar-h: 50px; }
+      .tb-btn   { padding: 5px 9px; font-size: 12px; }
+      .tb-sep   { height: 24px; margin: 0 2px; }
+      .tb-title { font-size: 12px; }
+      #page-input { width: 42px; font-size: 12px; }
+      #page-count { font-size: 12px; }
+      /* Hide only the extreme-navigation buttons to save toolbar space */
+      #btn-first, #btn-last { display: none; }
+      .nav-arrow {
+        width: 38px; height: 60px; font-size: 22px;
+      }
+      #nav-prev { left: 5px; }
+      #nav-next { right: 5px; }
+      #thumbs-bar.open { height: 100px; }
+      .thumb { height: 72px; }
+      #toc { width: 240px; }
+      #stage.toc-open { left: 240px; }
+      #hint { font-size: 11px; }
+    }
+
+    /* ── Landscape phone: very tight vertical space ───────────────────────── */
+    @media (max-width: 900px) and (max-height: 430px) {
+      :root { --toolbar-h: 36px; }
+      .tb-btn    { padding: 2px 6px; font-size: 10px; min-height: 0; }
+      .nav-arrow { width: 26px; height: 40px; font-size: 15px; }
+      #hint      { display: none; }
+    }
+
+    /* ── iPhone / Android safe-area insets (notch, home bar) ────────────── */
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+      #toolbar    { padding-left:  max(14px, env(safe-area-inset-left));
+                     padding-right: max(14px, env(safe-area-inset-right)); }
+      #thumbs-bar { padding-bottom: env(safe-area-inset-bottom); }
+      #hint       { bottom: calc(10px + env(safe-area-inset-bottom)); }
+    }
+
+    /* ── Print ────────────────────────────────────────────────────────────── */
+    @media print {
+      #toolbar, .nav-arrow, #hint, #pan-overlay,
+      #thumbs-bar, #loader, #share-toast { display: none !important; }
+      #stage { top: 0; }
+      #flipbook-wrap { transform: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<audio id="flip-sound" src="data:audio/wav;base64,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BwANAPH/8/8NAPL/9v/2//z/9/8LABEAGwARAPT/9f8EAPH/BgD1/wAA/f8DABAA/v/x//r/DgD3/wYAEgARAAkACQDx/wcA//8DAAEACwD4/wEA9f/y/wUA/P8KAAoA+//u//v/7P/s/wAAAwAQAPr/DQAHABQADwDx/+f/7/8LAPn/9v/6//L/9P8MAAEABAD+/xIADwD6//H/AADz/w0ABQASABcA+f/3/wkAEwD//wIA/v/z/wYABgADAAIABQD0/wMA6/8DAPj/8P/3/+//+v8BAPf/AQAMABgACQD1/wUAEgAVAA4A9f/x//H/CwACAAUA///1/+n/7P/7/wcAAADz/wMAAQAVAAUAAAAAAPH/CgAWAA4A+/8AAO//6v/3//n/CQAUAAoACQD6/wgA8/8JAP3/BgD1//b/+v///wgA+P8FAP//BwAAAO//BQAHAPX/AwAHAP7/EQAVAA0ACAD3/+v/9P/u/wYA9v8OAAIAAQDv//r/CwD5//7/EQD6//X/DgADAAMA9v/5//r/EAAXAAkA8P8DAO//BwACAA0ACQAFAP3/+P/1//z///8HAPX/8P/6//X/AwAGAAEADwANAAIA+f8AAA4ADwATAAsA7//5//3/+P/6/wMADQD0//f//v/u//P/+//4/wAAAAD7/wEA+f8SABgABwANAAkACADv//P/8f/1/woA/v8MAA4AAQD3/wgA///u/+7/+P8LABEACgD+/w0AEwD7/wkA9f/9/wYACAAAAO//+/8LAPb/BgAAAPv/7v8CAAAAAwAJAAwABQD2//v/CQD3/+3/9/8BAAQA8/8DABAA+f/6/wYA+P/9/wQA///5/wwAAAABAPr/BwAMAAwABwD5/wgAAwABAP//7//2////8//1/woA+f8AAP7/DAACAAEA8v/w/wwA+/8HAAEA/v8OABAA/P/v//H/AAAGAPf/DwAXAAcABAAAAPP/AQAMAPn/7f/r//z/+P8NAP3/+v/9//z/CgAWAAMAAQAPAAAAAAD5/wQAAAAAAPz/9f/z/wMADwAAAP7/AgAJAP7/BwAPAAIACQD9/wEABQAAAP//+f/7//f////w//D/7v/+/wYAAAANAAwAEwABAPH/8f/3/wgAAQD2/wMAAAALAPv/+//y//r/AQAOABQACgAAAAIAAAD0//X/AAANABAA+P8HAP//BQD7//f/8/8EAAIADwACAPT/8v/3//z/AwD+/wYADwAUABEA/f8EAPv/BQAJAPH/+//v/+3/AgAIAP7/BgAAAAEA+/8BAP7/BQAAAAkADwD4//f////x/+7/7v/z//3/CwAIAP///P8PAAUAEAAVABIADQD5/wAA8P8DAPL/9P///wgA/P/1//P//f/4/wsADgARABMAAQD8//H/+v8AAAMADgD//wMA9//1//b/8v///w0ACwALAPv/8v8IAPj/8f/2/wkA///5//r/BQAHABAADwAAAP//9v/+/wsA/f/8/wwADgADAAYA9//0//L/9v8IAAgA+v8IAAkA/P8IAPn/8P///wAA+/8LAPr//v/4/wAAAgD4//v/+P8FAA0ABgAAAAAABAAEAAIAAAAFAAYADgD8//H/7v/1//T/9v/8/wgADwAHAPz/CAAQAAAA+v8GAAAA+/8BAAgA+f///wUAAgD9/wkA/f/6//T/9v8JAP7/9v8AAAAA/P/+//r/CAARAAwAEgAIAAEA+P/y/wMAAwANAAwAAgD1//H/8P/3/wUAAwAJABEAAAD///v/8v/4/wQADQAMAAwADAACAPP//f8BAPL/BQAJAAQA9v/6//b/AQAMAAAABAD4/wYABAAKAAkAAwAFAPv/AwD9//P//P8EAPz/+f8HAPv/8P/6//r/AQAAAAAADAALAP7/CAAAAAEA/f/0/wUAAwADAPr/9/8CAPX/8f/3/wIA+v/9/wEACAD7//z/AAD//wwADAAMAP3/9f/4/wsA//8CAPn/+f8AAAAACgAJAAIADAD7//j/+f/7/wEABwAAAAMABgD8//f/AAD9//j/AQAGAAYAAQAKAAIA+f/9//z/CgAJAAIA///9//3/9P///wsAAwAHAAQA/P/4//3/9////wIA/v8GAAEA///1/wUADAAEAPf/8/8EAAcAAAD4//r/AAD///n/BgAJAAsA+//5//f/BQAEAP7/BQALAAAA/P8KAPn//f8DAPn/8/8AAPv/+f/7/wIADQAHAPz/+f///w4ADwAOAAUABwADAAYAAAD7//7/9f8AAAEA+P8AAAAA///6/wEACgACAAIA/f8BAPb/+v/8//X//f8CAPn//P8FAA0ACQD6/wcADQACAAMA+/8GAP3/BAAAAPr/AAD8//T////9/wQA//8EAAcA/v8DAP3/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YABgAF8AXwBeAF0AXgBfAF0AXQBeAF4AXABdAF0AXgBdAF0AXQBcAFkAWQBaAFgAWABYAFcAVgBYAFkAWQBXAFUAVgBWAFYAVABUAFQAUwBPAE4ATgBOAE0ATwBPAE4ATgBLAEsASwBIAEgASABFAEcARgBEAEUAQwBCAEIAQwBBAEEAPgA9ADwAPAA7ADkAOwA6ADkANgA2ADQANgA1ADQAMQAwADEALwAtAC0ALQArACsAKwAqACcAJgAmACUAJAAiACEAIQAhAB4AHgAcABwAGgAbABoAFwAVABUAFAAVABUAFAAQAA4AEAAQAA4ACwALAAwACgAJAAgABQADAAQAAgADAAEAAAABAP//AAD+//z/+//6//v/+v/4//n/+P/1//T/9P/0//H/8P/u/+7/7f/t/+3/7v/t/+z/6P/n/+f/6P/l/+X/5f/k/+P/4f/h/+H/4P/f/97/3//c/9z/2f/Y/9j/2f/Z/9n/1v/X/9b/1P/U/9L/0//U/9L/0v/R/8//zv/P/87/z//N/83/zf/L/8z/yv/K/8j/yP/I/8j/yf/J/8n/x//H/8b/xP/F/8T/w//C/8P/xf/E/8P/wf/D/8P/wf/C/8H/wP/A/8D/wP+//8D/wP/C/8H/v//A/8D/v//B/77/wP++/8D/vv++/77/vv++/8D/wP+//73/vv++/7//wP+//77/vv+//8D/wf/C/8D/wf+//8D/wP/A/8D/wP/D/8L/w//E/8T/w//D/8L/wv/C/8P/xf/G/8X/xv/F/8f/x//H/8b/x//H/8n/yv/J/8r/y//M/83/y//L/83/zv/N/8z/z//N/87/0P/Q/9L/0v/R/9H/0v/V/9X/1f/W/9b/1//X/9b/2P/Z/9j/2v/Z/9v/2//d/9v/3P/c/93/3//h/+D/4f/j/+L/4//k/+X/5v/l/+X/5v/o/+j/6P/o/+v/6v/t/+3/7f/t/+//7//w//H/8f/x//P/8v/y//T/9f/3//X/9//3//f/9//4//r//f/8//3////+//7//////wAAAAABAAEAAQADAAQABAADAAYABQAFAAcACAAHAAkACQAJAAoACgALAA4ADgAOAA8AEAAOABAAEQASABIAEgARABMAEwAUABQAFgAWABYAGAAXABcAGAAaABoAGgAaABsAGgAbABwAHAAdAB0AHQAeAB4AIAAhACEAIQAgACAAIgAjACQAIwAjACQAJQAlACUAJQAkACQAJQAmACcAJgAmACYAJgAmACcAKAApACoAKQApACoAKwAqACoAKgAqACsAKQApACkAKQAqACoAKwArACwALQAuACwALAAtAC4ALQAsACsALAAsACsAKwArACwALgAuAC4ALAAsAC0ALQAtAC0AKwAqACsAKwAsACwAKwAqACsAKgArACoAKwAqACoAKgAqACoAKQArACsAKwArACoAKQAoACcAKAApACcAJwAoACgAJgAmACYAJgAmACYAJQAlACQAIgAjACQAIwAjACMAIwAiACEAIQAgACAAIAAhACAAHgAfAB8AHgAdAB4AHAAbABsAHAAcABsAGwAaABsAGQAaABoAFwAXABcAFwAXABYAFgAWABUAFAAUABQAFAASABEAEQAQABAAEQAQABAADwAOAA0ADgANAA0ADAAMAAoACgAKAAoACQAJAAgACQAJAAcABQAGAAYABQAEAAMABQAEAAMABAADAAEAAgAAAAAAAAA=" preload="auto"></audio>
+<div id="share-toast">Link copied!</div>
+
+<!-- Loading -->
+<div id="loader">
+  <div class="spinner"></div>
+  <p>Loading&hellip;</p>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <button class="tb-btn" id="btn-toc"      title="Contents  [T]">&#9776;</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-first"    title="First page  [Home]">&#8676;</button>
+  <button class="tb-btn" id="btn-prev"     title="Previous  [&#8592;]">&#8249;</button>
+  <input  id="page-input" type="number" min="1" max="47" value="1" title="Go to page" />
+  <span   id="page-count">&nbsp;/ 47</span>
+  <button class="tb-btn" id="btn-next"     title="Next  [&#8594;]">&#8250;</button>
+  <button class="tb-btn" id="btn-last"     title="Last page  [End]">&#8677;</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-zoom-out" title="Zoom out  [-]">&#8722;</button>
+  <button class="tb-btn" id="btn-zoom-in"  title="Zoom in  [+]">&#43;</button>
+  <button class="tb-btn" id="btn-zoom-fit" title="Fit  [0]">Fit</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-thumbs"   title="Thumbnails  [H]">&#9638;</button>
+  <button class="tb-btn" id="btn-auto"     title="Auto-flip  [A]">&#9654; Auto</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-fs"       title="Fullscreen  [F]">&#x26F6;</button>
+  <button class="tb-btn" id="btn-share"    title="Copy link">&#128279; Share</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn active" id="btn-sound" title="Sound  [S]">&#128266;</button>
+  <div class="tb-sep"></div>
+  <span class="tb-title">Snkatha</span>
+</div>
+
+<!-- TOC -->
+<div id="toc">
+  <h3>Contents</h3>
+  <div id="toc-items"></div>
+</div>
+
+<!-- Stage -->
+<div id="stage">
+  <button class="nav-arrow" id="nav-prev">&#8249;</button>
+  <div id="flipbook-wrap">
+    <div id="flipbook"></div>
+  </div>
+  <div id="pan-overlay"></div>
+  <button class="nav-arrow" id="nav-next">&#8250;</button>
+</div>
+
+<!-- Thumbnail strip -->
+<div id="thumbs-bar"></div>
+
+<!-- Hint -->
+<div id="hint"></div>
+
+<script src="assets/js/page-flip.browser.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const IMAGES    = ["assets/pages/page_0001.jpg", "assets/pages/page_0002.jpg", "assets/pages/page_0003.jpg", "assets/pages/page_0004.jpg", "assets/pages/page_0005.jpg", "assets/pages/page_0006.jpg", "assets/pages/page_0007.jpg", "assets/pages/page_0008.jpg", "assets/pages/page_0009.jpg", "assets/pages/page_0010.jpg", "assets/pages/page_0011.jpg", "assets/pages/page_0012.jpg", "assets/pages/page_0013.jpg", "assets/pages/page_0014.jpg", "assets/pages/page_0015.jpg", "assets/pages/page_0016.jpg", "assets/pages/page_0017.jpg", "assets/pages/page_0018.jpg", "assets/pages/page_0019.jpg", "assets/pages/page_0020.jpg", "assets/pages/page_0021.jpg", "assets/pages/page_0022.jpg", "assets/pages/page_0023.jpg", "assets/pages/page_0024.jpg", "assets/pages/page_0025.jpg", "assets/pages/page_0026.jpg", "assets/pages/page_0027.jpg", "assets/pages/page_0028.jpg", "assets/pages/page_0029.jpg", "assets/pages/page_0030.jpg", "assets/pages/page_0031.jpg", "assets/pages/page_0032.jpg", "assets/pages/page_0033.jpg", "assets/pages/page_0034.jpg", "assets/pages/page_0035.jpg", "assets/pages/page_0036.jpg", "assets/pages/page_0037.jpg", "assets/pages/page_0038.jpg", "assets/pages/page_0039.jpg", "assets/pages/page_0040.jpg", "assets/pages/page_0041.jpg", "assets/pages/page_0042.jpg", "assets/pages/page_0043.jpg", "assets/pages/page_0044.jpg", "assets/pages/page_0045.jpg", "assets/pages/page_0046.jpg", "assets/pages/page_0047.jpg"];
+  const BOOKMARKS = [];
+  const PAGE_W    = 1654;
+  const PAGE_H    = 1654;
+  const TOTAL     = 47;
+
+  let pageFlip   = null;
+  let zoomScale  = 1.0;
+  let panX       = 0;
+  let panY       = 0;
+  let autoTimer  = null;
+  let tocOpen    = false;
+  let thumbsOpen = false;
+
+  const $ = id => document.getElementById(id);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function currentIndex() {
+    return pageFlip ? pageFlip.getCurrentPageIndex() : 0;
+  }
+
+  function syncUI() {
+    $('page-input').value = currentIndex() + 1;
+    document.querySelectorAll('.thumb').forEach((el, i) => {
+      el.classList.toggle('active', i === currentIndex());
+    });
+  }
+
+  // ── Sound ──────────────────────────────────────────────────────────────────
+  let _soundOn   = true;
+  let _prevState = '';
+
+  function playFlipSound() {
+    if (!_soundOn) return;
+    const audio = $('flip-sound');
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+
+  function toggleSound() {
+    _soundOn = !_soundOn;
+    $('btn-sound').classList.toggle('active', _soundOn);
+    $('btn-sound').innerHTML = _soundOn ? '&#128266;' : '&#128263;';
+    if (_soundOn) playFlipSound();
+  }
+
+  // ── Zoom + Pan ─────────────────────────────────────────────────────────────
+  function clampedPan(px, py) {
+    const stage = $('stage');
+    const wrap  = $('flipbook-wrap');
+    const maxPX = Math.max(0, (zoomScale * wrap.offsetWidth  - stage.offsetWidth)  / 2);
+    const maxPY = Math.max(0, (zoomScale * wrap.offsetHeight - stage.offsetHeight) / 2);
+    return [clamp(px, -maxPX, maxPX), clamp(py, -maxPY, maxPY)];
+  }
+
+  function commitTransform() {
+    $('flipbook-wrap').style.transform =
+      `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+  }
+
+  function applyZoom(scale) {
+    zoomScale = clamp(scale, 0.35, 4.5);
+    if (zoomScale <= 1.0) {
+      panX = panY = 0;
+      $('pan-overlay').classList.remove('active');
+    } else {
+      [panX, panY] = clampedPan(panX, panY);
+      $('pan-overlay').classList.add('active');
+    }
+    commitTransform();
+  }
+
+  // ── Flipbook init ──────────────────────────────────────────────────────────
+  function initFlipbook(restorePage) {
+    const wrap     = $('flipbook-wrap');
+    const isPhone  = window.innerWidth < 600;
+    const isTablet = !isPhone && window.innerWidth < 1024;
+    const isMobile = isPhone;
+    const thumbH   = thumbsOpen ? (isPhone ? 88 : 100) : 0;
+    const availW   = wrap.offsetWidth  - 20;
+    const availH   = wrap.offsetHeight - thumbH - 20;
+    const ratio    = PAGE_W / PAGE_H;
+
+    let cssW, cssH;
+    if (isMobile) {
+      let h = availH, w = h * ratio;
+      if (w > availW) { w = availW; h = w / ratio; }
+      cssW = Math.max(1, Math.floor(w));
+      cssH = Math.max(1, Math.floor(h));
+    } else {
+      let h = availH, w = h * ratio * 2;
+      if (w > availW) { w = availW; h = w / (ratio * 2); }
+      cssW = Math.max(1, Math.floor(w / 2));
+      cssH = Math.max(1, Math.floor(h));
+    }
+
+    const dpr     = Math.min(window.devicePixelRatio || 1, 3);
+    const renderW = Math.floor(cssW * dpr);
+    const renderH = Math.floor(cssH * dpr);
+
+    wrap.innerHTML = '';
+
+    const sizer = document.createElement('div');
+    sizer.style.cssText =
+      `width:${isMobile ? cssW : cssW * 2}px;height:${cssH}px;overflow:hidden;flex-shrink:0;`;
+
+    const inner = document.createElement('div');
+    inner.style.cssText =
+      `transform:scale(${1 / dpr});transform-origin:top left;`;
+
+    const flipEl = document.createElement('div');
+    flipEl.id = 'flipbook';
+    inner.appendChild(flipEl);
+    sizer.appendChild(inner);
+    wrap.appendChild(sizer);
+
+    panX = panY = 0;
+    zoomScale = 1.0;
+    commitTransform();
+    $('pan-overlay').classList.remove('active');
+
+    pageFlip = new St.PageFlip(flipEl, {
+      width:               renderW,
+      height:              renderH,
+      size:                'fixed',
+      maxShadowOpacity:    0.85,
+      showCover:           true,
+      mobileScrollSupport: false,
+      clickEventForward:   false,
+      usePortrait:         isMobile,
+      drawShadow:          true,
+      flippingTime:        800,
+      useMouseEvents:      true,
+      swipeDistance:       isPhone ? 20 : (isTablet ? 22 : 25),
+      autoSize:            false,
+      showPageCorners:     true,
+      disableFlipByClick:  false,
+    });
+
+    pageFlip.loadFromImages(IMAGES);
+
+    pageFlip.on('changeState', state => {
+      if (state === 'flipping' && _prevState !== 'flipping') playFlipSound();
+      _prevState = state;
+      syncUI();
+    });
+    pageFlip.on('init', () => {
+      $('loader').classList.add('hidden');
+      if (restorePage !== undefined) pageFlip.turnToPage(restorePage);
+      syncUI();
+    });
+  }
+
+  // ── TOC ────────────────────────────────────────────────────────────────────
+  function buildToc() {
+    const container = $('toc-items');
+    if (!BOOKMARKS.length) {
+      container.innerHTML =
+        '<p style="padding:0 16px;color:var(--text-dim);font-size:13px">No outline found.</p>';
+      return;
+    }
+    BOOKMARKS.forEach(bm => {
+      const el = document.createElement('div');
+      el.className = 'toc-item' +
+        (bm.level === 2 ? ' toc-l2' : bm.level >= 3 ? ' toc-l3' : '');
+      el.textContent = bm.title;
+      el.title = 'Page ' + (bm.page + 1);
+      el.addEventListener('click', () => { pageFlip.turnToPage(bm.page); closeToc(); });
+      container.appendChild(el);
+    });
+  }
+
+  function toggleToc() {
+    tocOpen = !tocOpen;
+    $('toc').classList.toggle('open', tocOpen);
+    $('stage').classList.toggle('toc-open', tocOpen);
+    $('btn-toc').classList.toggle('active', tocOpen);
+  }
+  function closeToc() { if (tocOpen) toggleToc(); }
+
+  // ── Thumbnails ─────────────────────────────────────────────────────────────
+  function buildThumbs() {
+    const bar = $('thumbs-bar');
+    if (bar.children.length) return;
+    IMAGES.forEach((src, i) => {
+      const img     = document.createElement('img');
+      img.src       = src;
+      img.className = 'thumb';
+      img.title     = 'Page ' + (i + 1);
+      img.loading   = 'lazy';
+      img.addEventListener('click', () => pageFlip.turnToPage(i));
+      bar.appendChild(img);
+    });
+  }
+
+  function toggleThumbs() {
+    thumbsOpen = !thumbsOpen;
+    $('thumbs-bar').classList.toggle('open', thumbsOpen);
+    $('btn-thumbs').classList.toggle('active', thumbsOpen);
+    if (thumbsOpen) buildThumbs();
+  }
+
+  // ── Auto-flip ──────────────────────────────────────────────────────────────
+  function toggleAuto() {
+    if (autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      $('btn-auto').classList.remove('active');
+      $('btn-auto').innerHTML = '&#9654; Auto';
+    } else {
+      autoTimer = setInterval(() => {
+        if (currentIndex() >= TOTAL - 1) { toggleAuto(); }
+        else { pageFlip.flipNext(); }
+      }, 3000);
+      $('btn-auto').classList.add('active');
+      $('btn-auto').innerHTML = '&#9646;&#9646; Stop';
+    }
+  }
+
+  // ── Fullscreen ─────────────────────────────────────────────────────────────
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      $('btn-fs').innerHTML = '&#x26F6; Exit';
+    } else {
+      document.exitFullscreen();
+      $('btn-fs').innerHTML = '&#x26F6;';
+    }
+  }
+
+  // ── Share ──────────────────────────────────────────────────────────────────
+  function shareLink() {
+    navigator.clipboard.writeText(location.href).catch(() => {});
+    const toast = $('share-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+
+  // ── Event wiring ───────────────────────────────────────────────────────────
+  function wireEvents() {
+    $('btn-toc').addEventListener('click',      toggleToc);
+    $('nav-prev').addEventListener('click',     () => pageFlip.flipPrev());
+    $('nav-next').addEventListener('click',     () => pageFlip.flipNext());
+    $('btn-first').addEventListener('click',    () => pageFlip.turnToPage(0));
+    $('btn-prev').addEventListener('click',     () => pageFlip.flipPrev());
+    $('btn-next').addEventListener('click',     () => pageFlip.flipNext());
+    $('btn-last').addEventListener('click',     () => pageFlip.turnToPage(TOTAL - 1));
+    $('btn-zoom-in').addEventListener('click',  () => applyZoom(zoomScale + 0.15));
+    $('btn-zoom-out').addEventListener('click', () => applyZoom(zoomScale - 0.15));
+    $('btn-zoom-fit').addEventListener('click', () => applyZoom(1.0));
+    $('btn-thumbs').addEventListener('click',   toggleThumbs);
+    $('btn-auto').addEventListener('click',     toggleAuto);
+    $('btn-fs').addEventListener('click',       toggleFullscreen);
+    $('btn-share').addEventListener('click',    shareLink);
+    $('btn-sound').addEventListener('click',    toggleSound);
+
+    $('page-input').addEventListener('change', () => {
+      const p = parseInt($('page-input').value, 10);
+      if (p >= 1 && p <= TOTAL) pageFlip.turnToPage(p - 1);
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT') return;
+      switch (e.key) {
+        case 'ArrowLeft':  case 'ArrowUp':   pageFlip.flipPrev();           break;
+        case 'ArrowRight': case 'ArrowDown': pageFlip.flipNext();           break;
+        case 'Home': pageFlip.turnToPage(0);                                break;
+        case 'End':  pageFlip.turnToPage(TOTAL - 1);                       break;
+        case 'f': case 'F': toggleFullscreen();                            break;
+        case 't': case 'T': toggleToc();                                   break;
+        case 'h': case 'H': toggleThumbs();                                break;
+        case 'a': case 'A': toggleAuto();                                  break;
+        case 's': case 'S': toggleSound();                                 break;
+        case '+': case '=': applyZoom(zoomScale + 0.15);                   break;
+        case '-': case '_': applyZoom(zoomScale - 0.15);                   break;
+        case '0':           applyZoom(1.0);                                break;
+      }
+    });
+
+    // Ctrl+Scroll = zoom; plain scroll when zoomed = pan
+    document.addEventListener('wheel', e => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        applyZoom(zoomScale + (e.deltaY < 0 ? 0.1 : -0.1));
+      } else if (zoomScale > 1.0) {
+        e.preventDefault();
+        [panX, panY] = clampedPan(panX - e.deltaX, panY - e.deltaY);
+        commitTransform();
+      }
+    }, { passive: false });
+
+    // Mouse drag-to-pan
+    const overlay = $('pan-overlay');
+    let _mdDrag = false, _mdStart = {};
+    overlay.addEventListener('mousedown', e => {
+      _mdDrag  = true;
+      _mdStart = { x: e.clientX, y: e.clientY, px: panX, py: panY };
+      overlay.classList.add('panning');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!_mdDrag) return;
+      [panX, panY] = clampedPan(
+        _mdStart.px + (e.clientX - _mdStart.x),
+        _mdStart.py + (e.clientY - _mdStart.y)
+      );
+      commitTransform();
+    });
+    document.addEventListener('mouseup', () => {
+      _mdDrag = false;
+      overlay.classList.remove('panning');
+    });
+
+    // Touch drag-to-pan (overlay active only when zoomed)
+    let _tpStart = {};
+    overlay.addEventListener('touchstart', e => {
+      if (e.touches.length === 1)
+        _tpStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, px: panX, py: panY };
+    }, { passive: true });
+    overlay.addEventListener('touchmove', e => {
+      if (e.touches.length === 1) {
+        [panX, panY] = clampedPan(
+          _tpStart.px + (e.touches[0].clientX - _tpStart.x),
+          _tpStart.py + (e.touches[0].clientY - _tpStart.y)
+        );
+        commitTransform();
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // Pinch-to-zoom + double-tap-to-zoom
+    let _pinchDist = null, _tapWasMulti = false;
+    document.addEventListener('touchstart', e => {
+      if (e.touches.length >= 2) {
+        _tapWasMulti = true;
+        _pinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      if (e.touches.length === 2 && _pinchDist !== null) {
+        const d = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        applyZoom(zoomScale * (d / _pinchDist));
+        _pinchDist = d;
+        e.preventDefault();
+      }
+    }, { passive: false });
+    document.addEventListener('touchend', e => {
+      if (e.touches.length < 2) _pinchDist = null;
+    }, { passive: true });
+
+    // Double-tap: toggle fit (1×) ↔ 2.5× for comfortable reading
+    let _lastTap = 0, _lastTapX = 0, _lastTapY = 0;
+    document.addEventListener('touchend', e => {
+      if (e.touches.length === 0 && _tapWasMulti) { _tapWasMulti = false; return; }
+      if (_tapWasMulti || e.changedTouches.length !== 1 || e.touches.length > 0) return;
+      const now = Date.now(), cx = e.changedTouches[0].clientX, cy = e.changedTouches[0].clientY;
+      if (now - _lastTap < 300 && Math.hypot(cx - _lastTapX, cy - _lastTapY) < 35) {
+        e.preventDefault();
+        applyZoom(zoomScale > 1.05 ? 1.0 : 2.5);
+        _lastTap = 0;
+      } else {
+        _lastTap = now; _lastTapX = cx; _lastTapY = cy;
+      }
+    }, { passive: false });
+
+    // Resize + orientation
+    let _resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(() => { initFlipbook(currentIndex()); }, 280);
+    });
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => { initFlipbook(currentIndex()); }, 450);
+    });
+  }
+
+  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    buildToc();
+    wireEvents();
+    initFlipbook();
+
+    const isTouch  = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isPhoneHint = window.innerWidth < 600;
+    $('hint').innerHTML = isTouch
+      ? (isPhoneHint
+          ? 'Swipe to flip &nbsp;|&nbsp; Double-tap or pinch to zoom &nbsp;|&nbsp; Drag when zoomed'
+          : 'Swipe or tap edge to flip &nbsp;|&nbsp; Double-tap or pinch to zoom &nbsp;|&nbsp; Drag when zoomed')
+      : '&larr; &rarr; Navigate &nbsp;|&nbsp; Ctrl+Scroll Zoom &nbsp;|&nbsp; Drag when zoomed &nbsp;|&nbsp; <kbd>F</kbd> Full &nbsp;|&nbsp; <kbd>A</kbd> Auto &nbsp;|&nbsp; <kbd>S</kbd> Sound';
+  });
+
+})();
+</script>
+</body>
+</html>
